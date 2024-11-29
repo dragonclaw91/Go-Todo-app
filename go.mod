@@ -1,4 +1,4 @@
-module davidbrown/goToDoApp
+module documents/Go-Todo-app
 
 go 1.23.3
 

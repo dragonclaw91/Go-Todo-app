@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 
-	"github.com/julienschmidt/httprouter"
 	_ "github.com/lib/pq"
 )
 
@@ -16,8 +14,12 @@ import (
 // const creditScoreMax = 900
 
 type Task struct {
-	Task string `json: "task"`
+	Task        string `json:"task"`
+	Id          string `json:"id"`
+	IsCompleted string `json:"iscompleted"`
 }
+
+var db *sql.DB
 
 const (
 	host     = "localhost"
@@ -27,50 +29,52 @@ const (
 	dbname   = "Todo"
 )
 
-// http package gives acess to rest commands
-func getCreditScore(w http.ResponseWriter, r *http.Request) {
-	var task Task
-	w.Write([]byte("new Note"))
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&task); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	fmt.Fprintf(w, "Note: %+v", task)
-	// var creditRating = credit_rating{
-	// 	// generates a random number between 0 and 400 and adds the min credit score to it
-	// 	//creating a json object with credit rating as the key and the random number as the value
-	// 	CreditRating: (rand.Intn(creditScoreMax-creditScoreMin) + creditScoreMin),
-	// }
-
-	// w.WriteHeader(http.StatusOK)
-	// json.NewEncoder(w).Encode(creditRating)
-}
-
-func indexGet(w http.ResponseWriter, r *http.Request) {
-	// Handle the GET request...
-}
-
-func indexPost(w http.ResponseWriter, r *http.Request) {
+func init() {
+	var err error
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
-	db, err := sql.Open("postgres", psqlInfo)
+	db, err = sql.Open("postgres", psqlInfo)
+
 	if err != nil {
 		panic(err)
 	}
-	defer db.Close()
+	// defer db.Close()
 
 	err = db.Ping()
 	if err != nil {
 		panic(err)
 	}
-	// Handle the POST request...
-	// Ensure the request method is POST
-	if r.Method != http.MethodPost {
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-		return
+}
+
+func taskGet() ([]Task, error) {
+
+	rows, err := db.Query(`SELECT * FROM "List" ORDER BY "isComplete"`)
+	// err := db.Query()
+	if err != nil {
+		panic(err)
 	}
+	defer rows.Close()
+	var tasks []Task
+	// Loop through rows, using Scan to assign column data to struct fields.
+	for rows.Next() {
+		var task Task
+		if err := rows.Scan(&task.Task, &task.Id, &task.IsCompleted); err != nil {
+			return tasks, err
+		}
+		tasks = append(tasks, task)
+	}
+	if err = rows.Err(); err != nil {
+		return tasks, err
+	}
+
+	return tasks, nil
+
+}
+
+func taskPostPut(w http.ResponseWriter, r *http.Request, sql string, arg string) {
+
+	// Handle the POST request...
 
 	// Read the request body
 	body, err := io.ReadAll(r.Body)
@@ -86,43 +90,46 @@ func indexPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
 		return
 	}
-	sqlStatement := `
-	INSERT INTO "List" ("task")
-	VALUES ($1)
-	RETURNING id`
+	sqlStatement := sql
 	id := 0
-	err = db.QueryRow(sqlStatement, task.Task).Scan(&id)
+	if arg == "POST" {
+		err = db.QueryRow(sqlStatement, task.Task).Scan(&id)
+	}
+	if arg == "PUT" {
+		err = db.QueryRow(sqlStatement, task.Id).Scan(&id)
+	}
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("New record ID is:", id)
-	// Process the data (for demonstration, just print it)
-	fmt.Printf("Received: %+v\n", task)
-
-	// Respond with a success message
-	w.Header().Set("Content-Type", "application/json")
-	response := map[string]string{
-		"status":  "success",
-		"message": fmt.Sprintf("Hello, %s!", task.Task),
-	}
-	json.NewEncoder(w).Encode(response)
+	fmt.Println("New record ID is:", arg)
 
 }
 
-func handleRequests() {
-	router := httprouter.New()
+func handler(w http.ResponseWriter, r *http.Request) {
 
-	router.HandlerFunc("GET", "/", indexGet)
-	router.HandlerFunc("POST", "/todo", indexPost)
-	http.Handle(" /todo", http.HandlerFunc(getCreditScore))
-	log.Fatal(http.ListenAndServe(":8080", router))
-	// http.HandleFunc("POST /todo", getCreditScore)
-	// http.HandleFunc("GET /", getCreditScore)
+	switch r.Method {
+	case http.MethodGet:
+		taskGet()
+	case http.MethodPost:
+		taskPostPut(w, r, `
+		INSERT INTO "List" ("task")
+		VALUES ($1) RETURNING id`, "POST")
+		fmt.Fprintln(w, "You made a POST request!")
+	case http.MethodPut:
+		taskPostPut(w, r, `UPDATE "List" SET "isComplete"=NOT "isComplete","completed_at"=NOW() WHERE "id"=$1 RETURNING id`, "PUT")
+		fmt.Fprintln(w, "You made a PUT request!")
+	case http.MethodDelete:
+		fmt.Fprintln(w, "You made a DELETE request!")
+		taskPostPut(w, r, ` DELETE FROM "List" WHERE "id"=$1 RETURNING id`, "PUT")
+	default:
+		http.Error(w, "Unsupported HTTP method", http.StatusMethodNotAllowed)
+	}
 }
 
 func main() {
-
 	// fmt.Println("New record ID is:", id)
+	http.HandleFunc("/", handler)
+	fmt.Println("Server is running on http://localhost:8080")
+	http.ListenAndServe(":8080", nil)
 	fmt.Println("Successfully connected!")
-	handleRequests()
 }
