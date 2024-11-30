@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/gin-gonic/contrib/static"
+	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 )
 
@@ -127,9 +129,25 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+
+	router := gin.Default()
+
+	// Serve frontend static files
+	router.Use(static.Serve("/", static.LocalFile("./client/build", true)))
+	api := router.Group("/api")
+	{
+		api.GET("/", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"message": "pong",
+			})
+		})
+	}
+
+	// Start and run the server
+	router.Run(":5000")
 	// fmt.Println("New record ID is:", id)
 	http.HandleFunc("/", handler)
-	fmt.Println("Server is running on http://localhost:8080")
-	http.ListenAndServe(":8080", nil)
+	fmt.Println("Server is running on http://localhost:5000")
+	// http.ListenAndServe(":8080", nil)
 	fmt.Println("Successfully connected!")
 }
