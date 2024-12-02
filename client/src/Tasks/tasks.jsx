@@ -3,7 +3,7 @@ import { Col, Row, InputGroup, Form, Button } from "react-bootstrap";
 import "./tasks.css"
 import { TbHttpDelete } from "react-icons/tb";
 import { useState } from 'react';
-import { useStore, put } from"../Main/client.controller.jsx"
+import { useStore } from"../Main/client.controller.jsx"
 
 function Tasks(props) {
     const [val, setVal] = useState(false);
@@ -24,7 +24,7 @@ function Tasks(props) {
 
         <Row className="task space" >
             <Col>
-                <TbHttpDelete size={30} color="red" />
+                <TbHttpDelete onClick={props.delete} size={30} color="red" />
             </Col>
             <Col className="test text" >
                 {props.task.task}

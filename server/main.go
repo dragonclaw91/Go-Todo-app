@@ -79,7 +79,7 @@ func taskGet() Result {
 
 }
 
-func taskPostPut(c *gin.Context, sql string, arg string) {
+func taskPostPut(c *gin.Context, sql string, arg string, ids string) {
 	var err error
 	// Handle the POST request...
 	// stmt, err :=
@@ -91,7 +91,7 @@ func taskPostPut(c *gin.Context, sql string, arg string) {
 	// Read the request body
 	body, err := io.ReadAll(c.Request.Body)
 	// fmt.Println(body)
-	println(string(body))
+	println("CHECKING THE BODY", string(body))
 	// if err != nil {
 	// 	http.Error(w, "Failed to read request body", http.StatusInternalServerError)
 	// 	return
@@ -100,10 +100,13 @@ func taskPostPut(c *gin.Context, sql string, arg string) {
 
 	// Parse the JSON body
 	var task Task
+	fmt.Println("New DELETE:", string(body))
 
-	if err := json.Unmarshal(body, &task); err != nil {
-		fmt.Println("Error unmarshalling JSON:", err)
-		return
+	if ids == "" {
+		if err := json.Unmarshal(body, &task); err != nil {
+			fmt.Println("Error unmarshalling JSON:", err)
+			return
+		}
 	}
 	sqlStatement := sql
 	id := 0
@@ -111,7 +114,12 @@ func taskPostPut(c *gin.Context, sql string, arg string) {
 		err = db.QueryRow(sqlStatement, task.Task).Scan(&id)
 	}
 	if arg == "PUT" {
+		fmt.Println("New DELETE:", task)
 		err = db.QueryRow(sqlStatement, task.Id).Scan(&id)
+	}
+	if arg == "DELETE" {
+		fmt.Println("New DELETE:", ids)
+		err = db.QueryRow(sqlStatement, ids).Scan(&id)
 	}
 	if err != nil {
 		panic(err)
@@ -151,7 +159,15 @@ func main() {
 	{
 		api.PUT("/", func(c *gin.Context) {
 
-			taskPostPut(c, `UPDATE "List" SET "isComplete"=NOT "isComplete" WHERE "id"=$1 RETURNING id`, "PUT")
+			taskPostPut(c, `UPDATE "List" SET "isComplete"=NOT "isComplete" WHERE "id"=$1 RETURNING id`, "PUT", "")
+
+			// taskPostPut(*gin.Context)
+			c.JSON(http.StatusOK, nil)
+		})
+		api.DELETE("/:id", func(c *gin.Context) {
+			id := c.Param("id")
+			println("INCOMEING", (id))
+			taskPostPut(c, `DELETE FROM "List" WHERE "id"=$1 RETURNING id`, "DELETE", id)
 
 			// taskPostPut(*gin.Context)
 			c.JSON(http.StatusOK, nil)
@@ -160,7 +176,7 @@ func main() {
 
 			taskPostPut(c, `
 			INSERT INTO "List" ("task")
-			VALUES ($1) RETURNING id`, "POST")
+			VALUES ($1) RETURNING id`, "POST", "")
 
 			// taskPostPut(*gin.Context)
 			c.JSON(http.StatusOK, nil)

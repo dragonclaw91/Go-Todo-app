@@ -2,7 +2,7 @@ import React from "react";
 import { Col, Row, InputGroup, Form, Button } from "react-bootstrap";
 import "./client.css"
 import Tasks from '../Tasks/tasks.jsx'
-import { useStore, useInputStore, post, put } from "./client.controller.jsx"
+import { useStore, useInputStore,  postData, put } from "./client.controller.jsx"
 import  { useState } from 'react';
 
 
@@ -11,10 +11,10 @@ import  { useState } from 'react';
 
 function Main() {
     let tasks = []
-    // const { fetchData, data } = useStore();
+    const { fetchData, postData, updateData, deleteData } = useStore();
     const data = useStore((state) => state.data);
     const isLoading = useStore((state) => state.isLoading);
-    const fetchData = useStore((state) => state.fetchData);
+    // const fetchData = useStore((state) => state.fetchData);
     //  const     inputValue = useInputStore((state) => state.inputValue);
     //   const   updateInputValue = useInputStore((state) => state.updateInputValue);
 
@@ -27,22 +27,46 @@ function Main() {
 
     console.log("CHECKING DATA", data.data?.data.Value,inputValue)
     tasks = data.data?.data.Value || []
-    const handleClick = async () => {
-        console.log('Button clicked!');
-     const response = await post({"task":`${inputValue}`})
-     console.log("RESPONSE 2",response)
-        updateInputValue('');
-      await  fetchData();
-        // updateState(response.data); 
-    }
 
-    const  handleput =  (id) => {
-        console.log('PUT Button clicked!',id);
-       put({"id":`${id}`})
-      console.log("FINISHED PUT")
-      fetchData();
-      console.log("FINISHED FETCH")
-    }
+
+
+    // const handleClick = async () => {
+    //     console.log('Button clicked!');
+    //  const response = await post({"task":`${inputValue}`})
+    //  console.log("RESPONSE 2",response)
+    //     updateInputValue('');
+    //   await  fetchData();
+    //     // updateState(response.data); 
+    // }
+
+    const handleClick = async (id) => {
+        try {
+          await postData(inputValue); // POST the form data
+          await fetchData();        // Fetch updated data
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
+      const handlePut = async (id) => {
+        try {
+          await updateData(id); // POST the form data
+          await fetchData();        // Fetch updated data
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
+      const handleDelete = async (id) => {
+        console.log("DELETEING ID",id)
+        try {
+          await deleteData(id); // POST the form data
+          await fetchData();        // Fetch updated data
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
     React.useEffect(() => {
         fetchData();
     }, []);
@@ -70,7 +94,7 @@ function Main() {
             <Col>
                 {console.log("TASKS", tasks)}
                 {tasks.map((task) => {
-                    return <Tasks key={task.id} task={task} put={()=> {handleput(task.id)}} />
+                    return <Tasks key={task.id} task={task} delete={()=> {handleDelete(task.id)}} put={()=> {handlePut(task.id)}} />
                 })}
             </Col>
         </Row>
