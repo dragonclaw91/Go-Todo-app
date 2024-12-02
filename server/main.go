@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/gin-gonic/contrib/static"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 )
@@ -16,9 +16,13 @@ import (
 // const creditScoreMax = 900
 
 type Task struct {
-	Task        string `json:"task"`
 	Id          string `json:"id"`
+	Task        string `json:"task"`
 	IsCompleted string `json:"iscompleted"`
+}
+type Result struct {
+	Value []Task
+	Err   error
 }
 
 var db *sql.DB
@@ -49,7 +53,7 @@ func init() {
 	}
 }
 
-func taskGet() ([]Task, error) {
+func taskGet() Result {
 
 	rows, err := db.Query(`SELECT * FROM "List" ORDER BY "isComplete"`)
 	// err := db.Query()
@@ -61,35 +65,44 @@ func taskGet() ([]Task, error) {
 	// Loop through rows, using Scan to assign column data to struct fields.
 	for rows.Next() {
 		var task Task
-		if err := rows.Scan(&task.Task, &task.Id, &task.IsCompleted); err != nil {
-			return tasks, err
+		if err := rows.Scan(&task.Id, &task.Task, &task.IsCompleted); err != nil {
+			fmt.Println("<<<<<<< In the Get Function >>>>>>>>>", err)
+			return Result{tasks, err}
 		}
 		tasks = append(tasks, task)
 	}
 	if err = rows.Err(); err != nil {
-		return tasks, err
+		return Result{tasks, err}
 	}
 
-	return tasks, nil
+	return Result{tasks, nil}
 
 }
 
-func taskPostPut(w http.ResponseWriter, r *http.Request, sql string, arg string) {
-
+func taskPostPut(c *gin.Context, sql string, arg string) {
+	var err error
 	// Handle the POST request...
-
+	// stmt, err :=
+	// if err != nil {
+	// 	log.Println(err)
+	// 	return false
+	//    }
+	//    defer stmt.Close()
 	// Read the request body
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Failed to read request body", http.StatusInternalServerError)
-		return
-	}
-	defer r.Body.Close()
+	body, err := io.ReadAll(c.Request.Body)
+	// fmt.Println(body)
+	println(string(body))
+	// if err != nil {
+	// 	http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+	// 	return
+	// }
+	defer c.Request.Body.Close()
 
 	// Parse the JSON body
 	var task Task
+
 	if err := json.Unmarshal(body, &task); err != nil {
-		http.Error(w, "Invalid JSON format", http.StatusBadRequest)
+		fmt.Println("Error unmarshalling JSON:", err)
 		return
 	}
 	sqlStatement := sql
@@ -107,46 +120,67 @@ func taskPostPut(w http.ResponseWriter, r *http.Request, sql string, arg string)
 
 }
 
-func handler(w http.ResponseWriter, r *http.Request) {
-
-	switch r.Method {
-	case http.MethodGet:
-		taskGet()
-	case http.MethodPost:
-		taskPostPut(w, r, `
-		INSERT INTO "List" ("task")
-		VALUES ($1) RETURNING id`, "POST")
-		fmt.Fprintln(w, "You made a POST request!")
-	case http.MethodPut:
-		taskPostPut(w, r, `UPDATE "List" SET "isComplete"=NOT "isComplete","completed_at"=NOW() WHERE "id"=$1 RETURNING id`, "PUT")
-		fmt.Fprintln(w, "You made a PUT request!")
-	case http.MethodDelete:
-		fmt.Fprintln(w, "You made a DELETE request!")
-		taskPostPut(w, r, ` DELETE FROM "List" WHERE "id"=$1 RETURNING id`, "PUT")
-	default:
-		http.Error(w, "Unsupported HTTP method", http.StatusMethodNotAllowed)
-	}
-}
+// func handler(w http.ResponseWriter, r *http.Request) {
+// 	fmt.Println("<<<<<<< In the handler >>>>>>>>>")
+// 	switch r.Method {
+// 	case http.MethodGet:
+// 		taskGet()
+// 	case http.MethodPost:
+// 		taskPostPut(w, r, `
+// 		INSERT INTO "List" ("task")
+// 		VALUES ($1) RETURNING id`, "POST")
+// 		fmt.Fprintln(w, "You made a POST request!")
+// 	case http.MethodPut:
+// 		taskPostPut(w, r, `UPDATE "List" SET "isComplete"=NOT "isComplete","completed_at"=NOW() WHERE "id"=$1 RETURNING id`, "PUT")
+// 		fmt.Fprintln(w, "You made a PUT request!")
+// 	case http.MethodDelete:
+// 		fmt.Fprintln(w, "You made a DELETE request!")
+// 		taskPostPut(w, r, ` DELETE FROM "List" WHERE "id"=$1 RETURNING id`, "PUT")
+// 	default:
+// 		http.Error(w, "Unsupported HTTP method", http.StatusMethodNotAllowed)
+// 	}
+// }
 
 func main() {
 
 	router := gin.Default()
 
-	// Serve frontend static files
-	router.Use(static.Serve("/", static.LocalFile("./client/build", true)))
-	api := router.Group("/api")
+	router.Use(cors.Default())
+
+	api := router.Group("/")
 	{
+		api.PUT("/", func(c *gin.Context) {
+
+			taskPostPut(c, `UPDATE "List" SET "isComplete"=NOT "isComplete" WHERE "id"=$1 RETURNING id`, "PUT")
+
+			// taskPostPut(*gin.Context)
+			c.JSON(http.StatusOK, nil)
+		})
+		api.POST("/", func(c *gin.Context) {
+
+			taskPostPut(c, `
+			INSERT INTO "List" ("task")
+			VALUES ($1) RETURNING id`, "POST")
+
+			// taskPostPut(*gin.Context)
+			c.JSON(http.StatusOK, nil)
+		})
 		api.GET("/", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{
-				"message": "pong",
-			})
+
+			data := gin.H{
+				"message": "Hello from Go backend",
+				"status":  "success",
+				"data":    taskGet(),
+			}
+			c.JSON(http.StatusOK, data)
 		})
 	}
 
 	// Start and run the server
 	router.Run(":5000")
 	// fmt.Println("New record ID is:", id)
-	http.HandleFunc("/", handler)
+	// http.HandleFunc("/", handler)
+
 	fmt.Println("Server is running on http://localhost:5000")
 	// http.ListenAndServe(":8080", nil)
 	fmt.Println("Successfully connected!")
