@@ -42,7 +42,8 @@ function Main() {
     const handleClick = async (id) => {
         try {
           await postData(inputValue); // POST the form data
-          await fetchData();        // Fetch updated data
+          await fetchData();     
+                updateInputValue('');   // Fetch updated data
         } catch (err) {
           console.error(err);
         }
@@ -72,13 +73,13 @@ function Main() {
     }, []);
     return (
 
-        <Row>
+        <Row >
             <Col>
                 <Row className="center ">
                     Tasks
                 </Row>
             </Col>
-            <Col  >
+            <Col className="max" >
                 <InputGroup className="input" >
                     <Form.Control type="text"
                         value={inputValue}
@@ -91,7 +92,7 @@ function Main() {
                     </Row>
                 </InputGroup>
             </Col>
-            <Col>
+            <Col className="max">
                 {console.log("TASKS", tasks)}
                 {tasks.map((task) => {
                     return <Tasks key={task.id} task={task} delete={()=> {handleDelete(task.id)}} put={()=> {handlePut(task.id)}} />

@@ -23,10 +23,10 @@ function Tasks(props) {
     return (
 
         <Row className="task space" >
-            <Col>
+            <Col className="cursor" >
                 <TbHttpDelete onClick={props.delete} size={30} color="red" />
             </Col>
-            <Col className="test text" >
+            <Col className={`text ${props.task.iscompleted !== "false" ? "done" : ""}`} >
                 {props.task.task}
             </Col>
             <Col  >
